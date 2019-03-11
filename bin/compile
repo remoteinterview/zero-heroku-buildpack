@@ -4,24 +4,25 @@
 build_dir=$1
 cache_basedir=$2
 
-# Resolve node version using semver.io
-node_version=$(curl --silent --get --data-urlencode "range=${semver_range}" https://semver.io/node/resolve)
-npm_version=$(curl --silent --get --data-urlencode "range=${npm_semver_range}" https://semver.io/npm/resolve)
+ls $cache_basedir/zero
 
 check_node(){
+  # Resolve node version using semver.io
+  node_version=$(curl --silent --get --data-urlencode "range=${semver_range}" https://semver.io/node/resolve)
+  npm_version=$(curl --silent --get --data-urlencode "range=${npm_semver_range}" https://semver.io/npm/resolve)
+
+
   # Check if we have latest node in cache
   if [ -f $cache_basedir/node/version ]; then
     node_version_cached=$(cat $cache_basedir/node/version | xargs)
-    echo $node_version_cached
     if [ "$node_version_cached" != "$node_version" ]; then
       echo "Installing newer version of node. Discarding cached version."
       install_node
     else
       echo "Node found in cache"
-      # Move to vendor folder
+      # Copy to vendor folder
       mkdir -p $build_dir/vendor/node
       cp -R $cache_basedir/node $build_dir/vendor/
-      ls $build_dir/vendor/node
     fi
   else
     install_node
@@ -49,11 +50,39 @@ install_node(){
   mkdir -p $cache_basedir/node
   cp -R $build_dir/vendor/node $cache_basedir/
   echo $node_version > $cache_basedir/node/version
-  ls -l $cache_basedir/node
 }
 
 
+check_zero(){
+  zero_version=$(npm show zero version)
+  # Check if we have latest node in cache
+  if [ -f $cache_basedir/zero/version ]; then
+    zero_version_cached=$(cat $cache_basedir/zero/version | xargs)
+    if [ "$zero_version_cached" != "$zero_version" ]; then
+      echo "Installing newer version of zero. Discarding cached version."
+      install_zero
+    else
+      echo "Zero found in cache"
+      # Copy to vendor folder
+      mkdir -p $build_dir/vendor/zero
+      cp -R $cache_basedir/zero $build_dir/vendor/
+    fi
+  else
+    install_zero
+  fi
+}
 
+install_zero(){
+  # Install zero
+  echo "Installing Zero"
+  mkdir -p $build_dir/vendor/zero
+  npm i --prefix $build_dir/vendor/zero zero -g
+
+  # Save to cache too
+  mkdir -p $cache_basedir/zero
+  cp -R $build_dir/vendor/zero $cache_basedir/
+  echo $zero_version > $cache_basedir/zero/version
+}
 
 # Move app to a child folder (including any hidden files (dotfiles))
 cd $build_dir
@@ -66,11 +95,8 @@ shopt -u dotglob
 mkdir -p $build_dir/vendor
 
 check_node
+check_zero
 
-# Install zero
-echo "Installing Zero"
-mkdir -p $build_dir/vendor/zero
-npm i --prefix $build_dir/vendor/zero zero -g
 # ls -l $build_dir/vendor/zero/bin
 PATH=$PATH:$build_dir/vendor/zero/bin
 echo "export PATH=\"\$HOME/vendor/zero/bin:\$PATH\";" > $build_dir/.profile.d/zero.sh
