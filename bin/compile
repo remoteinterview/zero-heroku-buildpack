@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# Configure directories
+build_dir=$1
+cache_basedir=$2
+
+# Resolve node version using semver.io
+node_version=$(curl --silent --get --data-urlencode "range=${semver_range}" https://semver.io/node/resolve)
+npm_version=$(curl --silent --get --data-urlencode "range=${npm_semver_range}" https://semver.io/npm/resolve)
+
+# Move app to a child folder (including any hidden files (dotfiles))
+cd $build_dir
+mkdir -p app
+shopt -s extglob dotglob
+mv !(app) app
+shopt -u dotglob
+
+# Download node from Heroku's S3 mirror of nodejs.org/dist
+echo "Downloading and installing node"
+node_url="http://s3pository.heroku.com/node/v$node_version/node-v$node_version-linux-x64.tar.gz"
+curl $node_url -s -o - | tar xzf - -C $build_dir
+
+
+# Move node (and npm) into ./vendor and make them executable
+mkdir -p $build_dir/vendor
+mv $build_dir/node-v$node_version-linux-x64 $build_dir/vendor/node
+chmod +x $build_dir/vendor/node/bin/*
+PATH=$PATH:$build_dir/vendor/node/bin
+
+echo "Building runtime environment"
+mkdir -p $build_dir/.profile.d
+echo "export PATH=\"\$HOME/vendor/node/bin:\$HOME/bin:\$HOME/node_modules/.bin:\$PATH\";" > $build_dir/.profile.d/nodejs.sh
+
+# Install zero
+echo "Installing Zero"
+mkdir -p $build_dir/vendor/zero
+npm i --prefix $build_dir/vendor/zero zero -g
+# ls -l $build_dir/vendor/zero/bin
+PATH=$PATH:$build_dir/vendor/zero/bin
+echo "export PATH=\"\$HOME/vendor/zero/bin:\$PATH\";" > $build_dir/.profile.d/zero.sh
+
+# check if Procfile exists
+# if [ -f $build_dir/app/Procfile ]; then
+#   echo "Found Procfile"
+# else
+#   echo "web: DEBUG=core NODE_ENV=production zero" | tee $build_dir/app/Procfile
+# fi
+
+echo "web: NODE_ENV=production zero app" | tee $build_dir/Procfile
+
+
+cd $build_dir/app
+
+# Install Zero and other packages
+if [ -f $build_dir/package.json ]; then
+  echo "Installing NPM Packages"
+  npm i
+fi
+
+# Build
+echo "Building App with Zero"
+PARCEL_WORKERS=1
+zero build $build_dir/app
