@@ -4,8 +4,6 @@
 build_dir=$1
 cache_basedir=$2
 
-ls $cache_basedir/zero
-
 check_node(){
   # Resolve node version using semver.io
   node_version=$(curl --silent --get --data-urlencode "range=${semver_range}" https://semver.io/node/resolve)
@@ -54,7 +52,7 @@ install_node(){
 
 
 check_zero(){
-  zero_version=$(npm show zero version)
+  zero_version=$(npm show zero@beta version)
   # Check if we have latest node in cache
   if [ -f $cache_basedir/zero/version ]; then
     zero_version_cached=$(cat $cache_basedir/zero/version | xargs)
@@ -70,17 +68,22 @@ check_zero(){
   else
     install_zero
   fi
+
+  PATH=$PATH:$build_dir/vendor/zero/bin
+  echo "export PATH=\"\$HOME/vendor/zero/bin:\$PATH\";" > $build_dir/.profile.d/zero.sh
 }
 
 install_zero(){
   # Install zero
   echo "Installing Zero"
   mkdir -p $build_dir/vendor/zero
-  npm i --prefix $build_dir/vendor/zero zero -g
+  npm i --prefix $build_dir/vendor/zero zero@beta -g
 
   # Save to cache too
   mkdir -p $cache_basedir/zero
   cp -R $build_dir/vendor/zero $cache_basedir/
+  echo "saving version id"
+  echo $zero_version
   echo $zero_version > $cache_basedir/zero/version
 }
 
@@ -91,29 +94,19 @@ shopt -s extglob dotglob
 mv !(app) app
 shopt -u dotglob
 
-
+# Create folder for node, zero etc
 mkdir -p $build_dir/vendor
 
+# Install or copy from cache
 check_node
 check_zero
 
-# ls -l $build_dir/vendor/zero/bin
-PATH=$PATH:$build_dir/vendor/zero/bin
-echo "export PATH=\"\$HOME/vendor/zero/bin:\$PATH\";" > $build_dir/.profile.d/zero.sh
-
-# check if Procfile exists
-# if [ -f $build_dir/app/Procfile ]; then
-#   echo "Found Procfile"
-# else
-#   echo "web: DEBUG=core NODE_ENV=production zero" | tee $build_dir/app/Procfile
-# fi
-
+# Add procfile
 echo "web: NODE_ENV=production zero app" | tee $build_dir/Procfile
 
 
+# Install packages
 cd $build_dir/app
-
-# Install Zero and other packages
 if [ -f $build_dir/package.json ]; then
   echo "Installing NPM Packages"
   npm i
@@ -121,5 +114,4 @@ fi
 
 # Build
 echo "Building App with Zero"
-PARCEL_WORKERS=1
-zero build $build_dir/app
+PARCEL_WORKERS=1 BUILDPATH=$cache_basedir/tmp/abc SKIPTEMPCLEAR="true" zero build $build_dir/app
