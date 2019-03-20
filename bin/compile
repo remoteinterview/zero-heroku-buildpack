@@ -52,7 +52,7 @@ install_node(){
 
 
 check_zero(){
-  zero_version=$(npm show zero@beta version)
+  zero_version=$(npm show zero version)
   # Check if we have latest node in cache
   if [ -f $cache_basedir/zero/version ]; then
     zero_version_cached=$(cat $cache_basedir/zero/version | xargs)
@@ -77,7 +77,7 @@ install_zero(){
   # Install zero
   echo "Installing Zero"
   mkdir -p $build_dir/vendor/zero
-  npm i --prefix $build_dir/vendor/zero zero@beta -g
+  npm i --prefix $build_dir/vendor/zero zero -g
 
   # Save to cache too
   mkdir -p $cache_basedir/zero
