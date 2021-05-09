@@ -1,13 +1,15 @@
+
 #!/bin/bash
 
 # Configure directories
 build_dir=$1
 cache_basedir=$2
 
-check_node() {
+check_node(){
   # Resolve node version using semver.io
   node_version=$(curl --silent --get --data-urlencode "range=${semver_range}" https://semver.io/node/resolve)
   npm_version=$(curl --silent --get --data-urlencode "range=${npm_semver_range}" https://semver.io/npm/resolve)
+
 
   # Check if we have latest node in cache
   if [ -f $cache_basedir/node/version ]; then
@@ -29,17 +31,15 @@ check_node() {
 
   echo "Building runtime environment"
   mkdir -p $build_dir/.profile.d
-  echo "export PATH=\"\$HOME/vendor/node/bin:\$HOME/bin:\$HOME/node_modules/.bin:\$PATH\";" >$build_dir/.profile.d/nodejs.sh
+  echo "export PATH=\"\$HOME/vendor/node/bin:\$HOME/bin:\$HOME/node_modules/.bin:\$PATH\";" > $build_dir/.profile.d/nodejs.sh
 }
 
-install_node() {
+install_node(){
   # Download node from Heroku's S3 mirror of nodejs.org/dist
-  echo "Downloading and installing node" # 16.1.0
-  node_file="node-v$node_version-linux-x64.tar.gz"
-  node_url="http://s3pository.heroku.com/node/v$node_version/$node_file"
-  curl -O $node_url
-  tar -xJvf $node_file -C $build_dir
-  rm $node_file
+  echo "Downloading and installing node"
+  node_url="http://s3pository.heroku.com/node/v$node_version/node-v$node_version-linux-x64.tar.gz"
+  curl -L $node_url -s -o - | tar xzf - -C $build_dir
+
 
   # Move node (and npm) into ./vendor and make them executable
   mv $build_dir/node-v$node_version-linux-x64 $build_dir/vendor/node
@@ -48,10 +48,11 @@ install_node() {
   # Save to cache too
   mkdir -p $cache_basedir/node
   cp -R $build_dir/vendor/node $cache_basedir/
-  echo $node_version >$cache_basedir/node/version
+  echo $node_version > $cache_basedir/node/version
 }
 
-check_zero() {
+
+check_zero(){
   zero_version=$(npm show zero version)
   # Check if we have latest node in cache
   if [ -f $cache_basedir/zero/version ]; then
@@ -70,10 +71,10 @@ check_zero() {
   fi
 
   PATH=$PATH:$build_dir/vendor/zero/bin
-  echo "export PATH=\"\$HOME/vendor/zero/bin:\$PATH\";" >$build_dir/.profile.d/zero.sh
+  echo "export PATH=\"\$HOME/vendor/zero/bin:\$PATH\";" > $build_dir/.profile.d/zero.sh
 }
 
-install_zero() {
+install_zero(){
   # Install zero
   echo "Installing Zero"
   mkdir -p $build_dir/vendor/zero
@@ -84,7 +85,7 @@ install_zero() {
   cp -R $build_dir/vendor/zero $cache_basedir/
   echo "saving version id"
   echo $zero_version
-  echo $zero_version >$cache_basedir/zero/version
+  echo $zero_version > $cache_basedir/zero/version
 }
 
 # Move app to a child folder (including any hidden files (dotfiles))
@@ -103,6 +104,7 @@ check_zero
 
 # Add procfile
 echo "web: NODE_ENV=production zero app" | tee $build_dir/Procfile
+
 
 # Install packages
 cd $build_dir/app
